@@ -44,6 +44,8 @@ ENV/
 *.pt
 *.pth
 mariam/models/
+*/models/*.keras
+*/models/*.h5
 
 # MacOS-related
 .DS_Store
@@ -51,7 +53,3 @@ mariam/models/
 # Logs
 logs/
 *.log
-
-main.py
-password_generator.py
-*/models/*
