@@ -1,12 +1,57 @@
-
-.venv/
+# Python-related
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.pyw
-*.pyz
-*.pywz
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# IDE-related
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Model files
+*.keras
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.pt
+*.pth
+mariam/models/
+
+# MacOS-related
 .DS_Store
+
+# Logs
+logs/
+*.log
+
 main.py
 password_generator.py
+*/models/*
