@@ -3,7 +3,7 @@
 import streamlit as st
 try:
     import tensorflow as tf
-    from tensorflow import keras
+    import keras
     TF_AVAILABLE = True
 except ImportError:
     TF_AVAILABLE = False
@@ -300,6 +300,26 @@ IMAGE_SIZE = (IMG_HEIGHT, IMG_WIDTH)
 MODEL_PATH = 'models/best_dual_model_robust_head.keras'
 GDRIVE_FILE_ID = '1QZQuuz9d0hyq2L8qCfcPceKm7VHnNPLV'
 
+# ---- SRM helper layer (same kernels we trained with) ----
+@keras.saving.register_keras_serializable()
+# ---- SRM helper layer (same kernels we trained with) ----
+class SRMLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        k1 = [[0,0,0],[0,1,0],[0,0,0]]
+        k2 = [[0,0,0],[0,-1,0],[0,0,0]]
+        k3 = [[-1,2,-1],[2,-4,2],[-1,2,-1]]
+        ker = tf.constant([k1, k2, k3], tf.float32)          # (3,3,3)
+        ker = tf.reshape(ker, (3,3,1,3))
+        ker = tf.repeat(ker, 3, axis=2)                      # RGB → 3 in-channels
+        self.kernel = ker
+    def call(self, x):
+        x = tf.nn.conv2d(x, self.kernel, 1, 'SAME')
+        return tf.math.abs(x)
+    def compute_output_shape(self, s):  # keeps tensor shape
+        return s
+
+
 # --- دوال مساعدة ---
 def download_model_if_needed(model_path, gdrive_file_id):
     models_dir = os.path.dirname(model_path)
@@ -352,7 +372,11 @@ pip install tensorflow
     model_loading_message = st.empty()
     try:
         model_loading_message.info("⏳ جاري تحميل النموذج...")
-        model = keras.models.load_model(model_path)
+        model = keras.models.load_model(
+            model_path,
+            custom_objects={'SRMLayer': SRMLayer},   # only layers needed
+            compile=False                            # <- skip deserialising focal_loss
+        )
         model_loading_message.success("✅ تم تحميل النموذج بنجاح!")
         import time
         time.sleep(1) # Shorter pause
@@ -364,20 +388,14 @@ pip install tensorflow
 
 # ------------------  PRE-PROCESSING HELPERS  ------------------
 def preprocess_image_rgb(pil_img, target_size=IMAGE_SIZE):
-    """RGB → ResNetV2 preprocess_input (range [-1,1])."""
     pil_img = pil_img.convert("RGB").resize(target_size)
-    arr = keras.preprocessing.image.img_to_array(pil_img)
-    arr = tf.keras.applications.resnet_v2.preprocess_input(arr)
-    return np.expand_dims(arr, axis=0)          # shape (1,h,w,3)
+    arr = np.array(pil_img).astype("float32") / 255.0   # 0-1 range
+    return np.expand_dims(arr, 0)
 
-def preprocess_image_ela(pil_img, target_size=IMAGE_SIZE):
-    """
-    ELA → NO manual scaling! Values remain 0-255 float32 because
-    the model contains layers.Rescaling(1/255) in that branch.
-    """
-    pil_img = pil_img.convert("RGB").resize(target_size)
-    arr = keras.preprocessing.image.img_to_array(pil_img).astype(np.float32)
-    return np.expand_dims(arr, axis=0)          # shape (1,h,w,3)
+def preprocess_image_ela(ela_pil, target_size=IMAGE_SIZE):
+    ela_pil = ela_pil.convert("RGB").resize(target_size)
+    arr = np.array(ela_pil).astype("float32") / 255.0   # 0-1 range
+    return np.expand_dims(arr, 0)
 
 
 def generate_ela_image(image_pil, quality=90, scale_factor=15):
@@ -413,7 +431,6 @@ def initialize_app():
         model = load_my_model(MODEL_PATH, GDRIVE_FILE_ID)
         if model is None:
             st.error("❌ حدث خطأ أثناء تحميل النموذج. لا يمكن تشغيل التطبيق.")
-            # This message will be shown if download_model_if_needed or keras.models.load_model fails within load_my_model
             return None
         return model
     else:
@@ -483,8 +500,8 @@ def main():
                         st.markdown("---")
                         st.markdown('<h2 class="section-header">📜 نتيجة التحليل</h2>', unsafe_allow_html=True)
 
-                        threshold = 0.5
-                        if proba > threshold:
+                        threshold = 0.45
+                        if proba >= threshold:
                             conf = proba * 100
                             st.markdown('<div class="result-box forged"><h3>⚠️ الصورة تبدو مزورة</h3></div>', unsafe_allow_html=True)
                             st.metric("درجة الثقة (مزورة)", f"{conf:.2f}%")
@@ -560,6 +577,12 @@ def main():
         st.markdown("---")
         current_time = datetime.now()
         st.markdown(f'<p style="text-align: center; font-size: 0.85em; color:#666;">📅 {current_time.strftime("%Y-%m-%d %H:%M")}</p>', unsafe_allow_html=True)
+
+        # Add threshold slider
+        threshold = st.sidebar.slider(
+            "Decision threshold (Tampered if score ≥ threshold)",
+            min_value=0.05, max_value=0.95, value=0.45, step=0.01
+        )
 
 if __name__ == "__main__":
     main()
