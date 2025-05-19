@@ -298,7 +298,7 @@ IMG_WIDTH = 224
 IMG_HEIGHT = 224
 IMAGE_SIZE = (IMG_HEIGHT, IMG_WIDTH)
 MODEL_PATH = 'models/best_dual_model_robust_head.keras'
-GDRIVE_FILE_ID = '1aiLqyEm1kdUbxmjBJfE755H88r5Lu8Hq'
+GDRIVE_FILE_ID = '1QZQuuz9d0hyq2L8qCfcPceKm7VHnNPLV'
 
 # --- دوال مساعدة ---
 def download_model_if_needed(model_path, gdrive_file_id):
